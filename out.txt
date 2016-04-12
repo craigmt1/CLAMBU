@@ -1,0 +1,21 @@
+Timer unit: 1e-06 s
+
+Total time: 8.50502 s
+File: jambu.py
+Function: main at line 76
+
+Line #      Hits         Time  Per Hit   % Time  Line Contents
+==============================================================
+    76                                           @profile
+    77                                           def main():
+    78         1          182    182.0      0.0      m = os.urandom(1000)
+    79         1            8      8.0      0.0      m = pad(m)
+    80                                           
+    81                                               #realcbc(m)
+    82                                               #cbc(m)
+    83                                               #jambu(m)
+    84                                               
+    85         1      1686564 1686564.0     19.8      bmark(cbc, (m,))
+    86         1      3410824 3410824.0     40.1      bmark(jambu, (m,))
+    87         1      3407442 3407442.0     40.1      bmark(jambunew, (m,))
+
