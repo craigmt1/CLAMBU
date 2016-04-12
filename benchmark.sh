@@ -1,2 +1,2 @@
-kernprof -l jambu.py
-python -m line_profiler jambu.py.lprof > out.txt
+kernprof -l clambu.py
+python -m line_profiler clambu.py.lprof > out.txt
