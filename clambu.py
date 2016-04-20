@@ -19,16 +19,17 @@ def ADblocks(m, x=16):
 def mblocks(m, x=16):
     for i in range(len(m) / x): yield m[i*x:(i+1)*x]
 
-def clamburound(AD, m, obj, iv='\x00'*16):
+def clamburound(m, obj, iv='\x00'*16, AD=''):
     X, Y = split(obj.encrypt(iv), 8)
     R = X
     #processing AD
-    for block in ADblocks(AD, 16):
-        A1, A2 = split(block, 8)
-        X, Y = split(obj.encrypt(X+Y), 8)
-        X1 = strxor(A1, X)
-        R = strxor(X1, R)
-        X, Y = Y, X
+    if AD != '':
+        for block in ADblocks(AD, 16):
+            A1, A2 = split(block, 8)
+            X, Y = split(obj.encrypt(X+Y), 8)
+            X1 = strxor(A1, X)
+            R = strxor(X1, R)
+            X, Y = Y, X
 
     #if verbose: print (strhex(X), " | ", strhex(Y))
     for block in mblocks(m, 16):
@@ -42,17 +43,17 @@ def clamburound(AD, m, obj, iv='\x00'*16):
             #print "\tX: %s\tY: %s" % (strhex(X), strhex(Y))
         yield C1 + C2
 
-def clambu_enc(AD, m, obj, iv='\x00'*16):
-    AD1 = pad(AD)
+def clambu_enc(m, obj, iv='\x00'*16, AD=''):
+    AD1 = pad(AD) if AD != '' else ''
     m = pad(m)
-    out = ''.join([r for r in clamburound(AD1, m, obj, iv)])
+    out = ''.join([r for r in clamburound(m, obj, iv, AD1)])
 
     return AD + b64e(out)
 
-def clambu_dec(AD, m, obj, iv='\x00'*16):
-    AD1 = pad(AD)
+def clambu_dec(m, obj, iv='\x00'*16, AD=''):
+    AD1 = pad(AD) if AD != '' else ''
     m = b64d(m)
-    out = ''.join([r for r in clamburound(AD1, m, obj, iv)])
+    out = ''.join([r for r in clamburound(m, obj, iv, AD1)])
 
     return AD + out
 
@@ -60,6 +61,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-e", "--encrypt", help="encrypt file", action="store_true")
     parser.add_argument("-d", "--decrypt", help="decrypt file", action="store_true")
+    parser.add_argument("--ad", help="Associated Data Flag (first line)", action="store_true")
     parser.add_argument("-i", metavar='in-file', type=argparse.FileType('rb'), help="input file argument")
     parser.add_argument("-o", help="output file argument", action="store", dest='output')
     parser.add_argument("-k", help="key argument", action="store", dest='key')
@@ -77,7 +79,10 @@ def main():
     if args.encrypt and args.decrypt: fail("Must select only one flag (-e or -d) for encryption/decryption")
 
     #input file argument (mandatory)
-    try: AD, s = args.i.readline(), args.i.readline()
+    try:
+        s = ''
+        AD = args.i.readline() if args.ad else ''
+        for line in args.i: s += line
     except: fail("Must provide input file")
 
     #output file argument
@@ -108,7 +113,7 @@ def main():
         print "Key    =\t", strhex(args.key)
         print "IV     =\t", strhex(args.iv)
 
-    out = clambu_dec(AD, s, obj, iv) if args.decrypt else clambu_enc(AD, s, obj, iv)
+    out = clambu_dec(s, obj, iv, AD) if args.decrypt else clambu_enc(s, obj, iv, AD)
     if verbose: print "\n" + "-"*20 + "OUTPUT BEGIN" + "-"*20 + "\n" + out +"\n" + "-"*21 + "OUTPUT END" + "-"*21 + "\n"
     f.write(out)
 
