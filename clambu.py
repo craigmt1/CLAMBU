@@ -13,17 +13,28 @@ strhex = lambda s: " ".join("{:02x}".format(ord(c)) for c in s) if s != None els
 pad = lambda s, l=16: s + (l - (len(s) % l)) * '\x00' if len(s) % l > 0 else s
 split = lambda s, i: (s[:i], s[i:])
 
-def blocks(m, x=16):
+def ADblocks(m, x=16):
     for i in range(len(m) / x): yield m[i*x:(i+1)*x]
 
-def clamburound(m, obj, iv='\x00'*16):
+def mblocks(m, x=16):
+    for i in range(len(m) / x): yield m[i*x:(i+1)*x]
+
+def clamburound(AD, m, obj, iv='\x00'*16):
     X, Y = split(obj.encrypt(iv), 8)
     R = X
+    #processing AD
+    for block in ADblocks(AD, 16):
+        A1, A2 = split(block, 8)
+        X, Y = split(obj.encrypt(X+Y), 8)
+        X1 = strxor(A1, X)
+        R = strxor(X1, R)
+        X, Y = Y, X
+
     #if verbose: print (strhex(X), " | ", strhex(Y))
-    for block in blocks(m, 16):
+    for block in mblocks(m, 16):
         P1, P2 = split(block, 8)
         X, Y = split(obj.encrypt(X+Y), 8)
-        R = strxor(P1, X)
+        R = strxor(X, R)
         C1, C2 = strxor(P1, X), strxor(P2, Y)
         X, Y = Y, X
         if verbose:
@@ -31,15 +42,19 @@ def clamburound(m, obj, iv='\x00'*16):
             #print "\tX: %s\tY: %s" % (strhex(X), strhex(Y))
         yield C1 + C2
 
-def clambu_enc(m, obj, iv='\x00'*16):
+def clambu_enc(AD, m, obj, iv='\x00'*16):
+    AD1 = pad(AD)
     m = pad(m)
-    out = ''.join([r for r in clamburound(m, obj, iv)])
-    return b64e(out)
+    out = ''.join([r for r in clamburound(AD1, m, obj, iv)])
 
-def clambu_dec(m, obj, iv='\x00'*16):
+    return AD + b64e(out)
+
+def clambu_dec(AD, m, obj, iv='\x00'*16):
+    AD1 = pad(AD)
     m = b64d(m)
-    out = ''.join([r for r in clamburound(m, obj, iv)])
-    return out
+    out = ''.join([r for r in clamburound(AD1, m, obj, iv)])
+
+    return AD + out
 
 def main():
     parser = argparse.ArgumentParser()
@@ -50,7 +65,7 @@ def main():
     parser.add_argument("-k", help="key argument", action="store", dest='key')
     parser.add_argument("--iv", help="initialization vector argument", action="store", dest='iv')
     parser.add_argument("-v", "--verbose", help="increase output verbosity", action="store_true")
-    
+
     try: args = parser.parse_args()
     except IOError, msg: parser.error(str(msg))
 
@@ -62,7 +77,7 @@ def main():
     if args.encrypt and args.decrypt: fail("Must select only one flag (-e or -d) for encryption/decryption")
 
     #input file argument (mandatory)
-    try: s = args.i.read()
+    try: AD, s = args.i.readline(), args.i.readline()
     except: fail("Must provide input file")
 
     #output file argument
@@ -93,7 +108,7 @@ def main():
         print "Key    =\t", strhex(args.key)
         print "IV     =\t", strhex(args.iv)
 
-    out = clambu_dec(s, obj, iv) if args.decrypt else clambu_enc(s, obj, iv)
+    out = clambu_dec(AD, s, obj, iv) if args.decrypt else clambu_enc(AD, s, obj, iv)
     if verbose: print "\n" + "-"*20 + "OUTPUT BEGIN" + "-"*20 + "\n" + out +"\n" + "-"*21 + "OUTPUT END" + "-"*21 + "\n"
     f.write(out)
 
