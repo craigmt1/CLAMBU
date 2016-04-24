@@ -22,6 +22,7 @@ def mblocks(m, x=16):
 def clamburound(m, obj, iv='\x00'*16, AD=''):
     X, Y = split(obj.encrypt(iv), 8)
     R = X
+    auth = ''
     #processing AD
     if AD != '':
         for block in ADblocks(AD, 16):
@@ -37,11 +38,55 @@ def clamburound(m, obj, iv='\x00'*16, AD=''):
         X, Y = split(obj.encrypt(X+Y), 8)
         R = strxor(X, R)
         C1, C2 = strxor(P1, X), strxor(P2, Y)
+        X, Y = C1, C2
         X, Y = Y, X
         if verbose:
             print strhex(block), " -> ", strhex(C1 + C2)
             #print "\tX: %s\tY: %s" % (strhex(X), strhex(Y))
         yield C1 + C2
+
+    t = strxor(strxor(X, Y), R)
+    auth += ''.join(t)
+    yield auth
+
+# Wrote a separate method for decryption, since the inputs to each BC call
+# are different for decryption, and because we need to withhold the PT if the
+# tag is invalid.
+
+def clambudecround(m, obj, iv='\x00'*16, AD=''):
+    X, Y = split(obj.encrypt(iv), 8)
+    R = X
+    PT = ''
+    auth = m[-8:]
+    m = m[:-8]
+    #processing AD
+    if AD != '':
+        for block in ADblocks(AD, 16):
+            A1, A2 = split(block, 8)
+            X, Y = split(obj.encrypt(X+Y), 8)
+            X1 = strxor(A1, X)
+            R = strxor(X1, R)
+            X, Y = Y, X
+    for block in mblocks(m, 16):
+        C1, C2 = split(block, 8)
+        X, Y = split(obj.encrypt(X+Y), 8)
+        R = strxor(X, R)
+        P1, P2 = strxor(C1, X), strxor(C2, Y)
+        X, Y = C1, C2
+        X, Y = Y, X
+        if verbose:
+            print strhex(block), " -> ", strhex(P1 + P2)
+            #print "\tX: %s\tY: %s" % (strhex(X), strhex(Y))
+        PT += ''.join(P1 + P2)
+
+    # Generate tag. Print message if valid,
+    # make them feel the wrath of CLAMBU if invalid
+    t = strxor(strxor(X, Y), R)
+    if (t == auth):
+        yield PT
+    else:
+        yield "Behold the power of CLAMBU"
+
 
 def clambu_enc(m, obj, iv='\x00'*16, AD=''):
     AD1 = pad(AD) if AD != '' else ''
@@ -53,7 +98,7 @@ def clambu_enc(m, obj, iv='\x00'*16, AD=''):
 def clambu_dec(m, obj, iv='\x00'*16, AD=''):
     AD1 = pad(AD) if AD != '' else ''
     m = b64d(m)
-    out = ''.join([r for r in clamburound(m, obj, iv, AD1)])
+    out = ''.join([r for r in clambudecround(m, obj, iv, AD1)])
 
     return AD + out
 
