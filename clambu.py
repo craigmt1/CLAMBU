@@ -169,5 +169,10 @@ def main():
 if __name__ == '__main__': main()
 
 #example usage:
+#(encrypt with AD):
+#./clambu.py --ad -i input.txt -k sixteen_byte_key
+# (or without AD):
 #./clambu.py -i input.txt -k sixteen_byte_key
-#./clambu.py -i --decrypt input.txt -o output.txt -k sixteen_byte_key --iv sixtasn_byse_cat -v
+# (decryption with AD):
+#./clambu.py --ad -d -i input.txt -o output.txt -k sixteen_byte_key --iv sixteen_byte_key
+# etc. etc.
